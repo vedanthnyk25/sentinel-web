@@ -1,0 +1,54 @@
+"use server";
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+export async function processCheckout(formData: FormData) {
+  const eventId= formData.get("eventId") as string;
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get("jwt")?.value;
+
+  if (!token) {
+    redirect("/login");
+    return;
+  }
+
+  const idempotencyKey = crypto.randomUUID();
+
+  const reserveResponse = await fetch(`http://localhost:8080/reserve`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+
+    },
+    body: JSON.stringify({ event_id: eventId}),
+  });
+
+  if (!reserveResponse.ok) {
+    throw new Error("Failed to reserve ticket");
+  }
+
+  const reserveData = await reserveResponse.json();
+  const reservationId = reserveData.reservation_id;
+
+  const checkoutResponse = await fetch(`http://localhost:8080/checkout`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reservation_id: reservationId }),
+  });
+
+  if (!checkoutResponse.ok) {
+    throw new Error("Failed to create checkout session");
+  }
+
+  const checkoutData = await checkoutResponse.json();
+  const checkoutUrl = checkoutData.checkout_url;
+
+  redirect(checkoutUrl);
+}
