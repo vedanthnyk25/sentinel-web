@@ -32,7 +32,7 @@ export async function processCheckout(formData: FormData) {
   }
 
   const reserveData = await reserveResponse.json();
-  const reservationId = reserveData.reservation_id;
+  const reservationId = reserveData.id;
 
   const checkoutResponse = await fetch(`http://localhost:8080/checkout`, {
     method: "POST",
@@ -48,7 +48,7 @@ export async function processCheckout(formData: FormData) {
   }
 
   const checkoutData = await checkoutResponse.json();
-  const checkoutUrl = checkoutData.checkout_url;
+  const checkoutUrl = checkoutData.url;
 
   redirect(checkoutUrl);
 }
