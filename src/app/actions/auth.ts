@@ -34,3 +34,9 @@ export async function loginUser(formData: FormData) {
 
     redirect("/");
 }
+
+export async function logoutUser() {
+  const cookieStore = await cookies();
+  cookieStore.delete("jwt");
+  redirect("/");
+}
