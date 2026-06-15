@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { UserCircle } from "lucide-react";
 import { logoutUser } from "@/app/actions/auth"; // We need to create this action!
+import { Button } from "./button";
 
 export default async function Header() {
   const cookieStore = await cookies();
@@ -19,6 +20,9 @@ export default async function Header() {
 
         {/* Navigation Group */}
         <div className="flex items-center gap-6">
+          <Link href="/demo">
+            <Button>Flash Sale Simulator</Button>
+          </Link>
           {token ? (
             // Logged In State
             <>
