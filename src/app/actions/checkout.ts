@@ -34,7 +34,12 @@ export async function processCheckout(formData: FormData) {
   const reserveData = await reserveResponse.json();
   const reservationId = reserveData.id;
 
-  const checkoutResponse = await fetch(`http://localhost:8080/checkout`, {
+  let checkoutResponse: Response | undefined;
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+  checkoutResponse = await fetch(`http://localhost:8080/checkout`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -43,8 +48,16 @@ export async function processCheckout(formData: FormData) {
     body: JSON.stringify({ reservation_id: reservationId }),
   });
 
-  if (!checkoutResponse.ok) {
-    throw new Error("Failed to create checkout session");
+  if (checkoutResponse.ok) {
+    break;
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 500));
+  attempts++;
+  }
+
+  if (!checkoutResponse || !checkoutResponse.ok) {
+    throw new Error("Failed to create checkout session: Reservation sync timeout");
   }
 
   const checkoutData = await checkoutResponse.json();
