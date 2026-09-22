@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { API_BASE_URL } from "@/lib/constants";
 
 export async function processCheckout(formData: FormData) {
   const eventId= formData.get("eventId") as string;
@@ -16,7 +17,7 @@ export async function processCheckout(formData: FormData) {
 
   const idempotencyKey = crypto.randomUUID();
 
-  const reserveResponse = await fetch(`http://localhost:8080/reserve`, {
+  const reserveResponse = await fetch(`${API_BASE_URL}/reserve`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -39,7 +40,7 @@ export async function processCheckout(formData: FormData) {
   const maxAttempts = 3;
 
   while (attempts < maxAttempts) {
-  checkoutResponse = await fetch(`http://localhost:8080/checkout`, {
+  checkoutResponse = await fetch(`${API_BASE_URL}/checkout`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${token}`,

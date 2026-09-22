@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formattedDate, formattedPrice } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/constants";
 
 interface Reservation {
   reservation_id: string;
@@ -21,7 +22,7 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const res = await fetch("http://localhost:8080/my-reservations", {
+  const res = await fetch(`${API_BASE_URL}/my-reservations`, {
     cache: "no-store", // Always fetch fresh data for the dashboard
     headers: {
       Authorization: `Bearer ${token}`,
@@ -37,10 +38,10 @@ export default async function DashboardPage() {
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-4xl font-extrabold mb-8">My Tickets</h1>
-      {/* Your turn! 
+      {/* Your turn!
         Map over the 'reservations' array here and render your Cards.
       */
-        reservations.map((reservation) => (
+        reservations?.map((reservation) => (
           <Card key={reservation.reservation_id}>
             <CardHeader>
               <CardTitle>{reservation.event_name}</CardTitle>

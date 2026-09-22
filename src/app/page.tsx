@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { formattedPrice, formattedDate } from "@/lib/utils";
+import { API_BASE_URL } from "@/lib/constants";
 
 interface Event {
   id: string;
@@ -12,12 +13,12 @@ interface Event {
     String: string;
     Valid: boolean;
   };
-  price: string; 
+  price: string;
   start_time: string;
 }
 
 async function getEvents(): Promise<Event[]> {
-  const res = await fetch('http://localhost:8080/events', { cache: 'no-store' });
+  const res = await fetch(`${API_BASE_URL}/events`, { cache: 'no-store' });
 
   if (!res.ok) {
     throw new Error('Failed to fetch events');
@@ -30,9 +31,9 @@ export default async function Home() {
   const events = await getEvents();
 
   return (
-    <div className="container mx-auto py-10"> 
+    <div className="container mx-auto py-10">
       <h1 className="text-4xl font-extrabold tracking-tight mb-8">Upcoming Events</h1>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {events.map(event => (
           <Card key={event.id} className="flex flex-col justify-between">
@@ -51,7 +52,7 @@ export default async function Home() {
 
             <CardFooter className="flex justify-between items-center">
               <p className="text-xl font-bold">{formattedPrice(event.price)}</p>
-              
+
               <Link href={`/events/${event.id}`}>
                 <Button>Get Tickets</Button>
               </Link>
@@ -62,4 +63,3 @@ export default async function Home() {
     </div>
   )
 }
-

@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import {
   Card,
   CardContent,
@@ -11,6 +8,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
+import { API_BASE_URL } from "@/lib/constants";
+import { RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type SimulationResult = {
   buyers: number;
@@ -19,152 +20,222 @@ type SimulationResult = {
   race_conditions: number;
   errors: number;
   inventory_remaining: number;
+  total_tickets?: number;
 };
 
-const TOTAL_TICKETS = 100;
+interface EventItem {
+  id: string;
+  name: string;
+  location: string;
+  date: string;
+}
+
+const DEFAULT_EVENT_ID = "22222222-2222-2222-2222-222222222222";
 
 export default function DemoPage() {
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>(DEFAULT_EVENT_ID);
+  const [ticketCapacity, setTicketCapacity] = useState<number>(100);
+  const [autoReset, setAutoReset] = useState<boolean>(true);
+  const [resetting, setResetting] = useState<boolean>(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+
   const [buyers, setBuyers] = useState(5000);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<SimulationResult | null>(null);
+  const [duration, setDuration] = useState<number | null>(null);
 
-  const [result, setResult] =
-    useState<SimulationResult | null>(null);
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/events`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setEvents(data);
+        }
+      })
+      .catch((err) => console.error("Failed to load events", err));
+  }, []);
 
-  const [duration, setDuration] =
-    useState<number | null>(null);
+  const handleManualReset = async () => {
+    try {
+      setResetting(true);
+      setResetMessage(null);
+      const res = await fetch(`${API_BASE_URL}/reset-inventory`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: selectedEventId,
+          tickets: ticketCapacity,
+        }),
+      });
+      if (res.ok) {
+        setResetMessage(`Inventory reset to ${ticketCapacity} tickets.`);
+      } else {
+        setResetMessage("Failed to reset inventory.");
+      }
+    } catch {
+      setResetMessage("Network error during inventory reset.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const runSimulation = async () => {
     try {
       setLoading(true);
-
+      setResetMessage(null);
       const start = performance.now();
 
-      const res = await fetch(
-        "http://localhost:8080/flash-sale",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            event_id:
-              "22222222-2222-2222-2222-222222222222",
-            buyers,
-          }),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/flash-sale`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: selectedEventId,
+          buyers,
+          reset_tickets: autoReset ? ticketCapacity : undefined,
+        }),
+      });
 
       const data = await res.json();
-
       setResult(data);
-
-      setDuration(
-        Math.round(
-          performance.now() - start
-        )
-      );
+      setDuration(Math.round(performance.now() - start));
     } finally {
       setLoading(false);
     }
   };
 
   const scenarios = [
-    {
-      label: "Light Load",
-      buyers: 100,
-    },
-    {
-      label: "Medium Load",
-      buyers: 5000,
-    },
-    {
-      label: "Heavy Load",
-      buyers: 50000,
-    },
-    {
-      label: "Viral Event",
-      buyers: 100000,
-    },
+    { label: "Light Load", buyers: 100 },
+    { label: "Medium Load", buyers: 5000 },
+    { label: "Heavy Load", buyers: 50000 },
+    { label: "Viral Event", buyers: 100000 },
   ];
 
-  const utilization = result
-    ? (
-        (result.success /
-          TOTAL_TICKETS) *
-        100
-      ).toFixed(0)
+  const totalTickets = result?.total_tickets ?? ticketCapacity;
+  const utilization = result && totalTickets > 0
+    ? ((result.success / totalTickets) * 100).toFixed(0)
     : "0";
 
   const consistencyPassed =
     result &&
-    result.success +
-      result.inventory_remaining ===
-      TOTAL_TICKETS;
+    result.success + result.inventory_remaining === totalTickets;
 
   return (
     <main className="container mx-auto max-w-7xl py-12 px-4">
       <div className="space-y-8">
         {/* HERO */}
-
         <div className="text-center space-y-3">
           <h1 className="text-5xl font-bold">
             Flash Sale Stress Test
           </h1>
-
           <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
-            Simulate extreme demand spikes and
-            verify inventory consistency under
+            Simulate extreme demand spikes and verify inventory consistency under
             heavy concurrency.
           </p>
         </div>
 
         {/* CONFIG */}
-
         <Card>
           <CardHeader>
-            <CardTitle>
-              Simulation Configuration
-            </CardTitle>
+            <CardTitle>Simulation Configuration</CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-8">
+            {/* EVENT SELECTOR & CAPACITY */}
+            <div className="grid md:grid-cols-2 gap-6 p-4 bg-muted/40 border border-border">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase text-muted-foreground">
+                  Target Catalogue Event
+                </label>
+                <select
+                  value={selectedEventId}
+                  onChange={(e) => setSelectedEventId(e.target.value)}
+                  className="w-full bg-background border border-input px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {events.length > 0 ? (
+                    events.map((evt) => (
+                      <option key={evt.id} value={evt.id}>
+                        {evt.name} — {evt.location}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={DEFAULT_EVENT_ID}>Coldplay Live</option>
+                  )}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">
+                    Available Tickets
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoReset}
+                        onChange={(e) => setAutoReset(e.target.checked)}
+                        className="rounded"
+                      />
+                      Auto-reset before test
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    value={ticketCapacity}
+                    onChange={(e) => setTicketCapacity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full bg-background border border-input px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={handleManualReset}
+                    disabled={resetting}
+                    className="flex items-center gap-1 shrink-0"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    {resetting ? "Resetting..." : "Reset Now"}
+                  </Button>
+                </div>
+                {resetMessage && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                    {resetMessage}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* SCENARIO PRESETS */}
             <div className="flex flex-wrap gap-2">
               {scenarios.map((s) => (
                 <Button
                   key={s.label}
-                  variant={
-                    buyers === s.buyers
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() =>
-                    setBuyers(s.buyers)
-                  }
+                  variant={buyers === s.buyers ? "default" : "outline"}
+                  onClick={() => setBuyers(s.buyers)}
                 >
                   {s.label}
                 </Button>
               ))}
             </div>
 
+            {/* CONCURRENT BUYERS SLIDER */}
             <div className="space-y-4">
               <Slider
                 value={[buyers]}
                 min={100}
                 max={100000}
                 step={100}
-                onValueChange={(v) =>
-                  setBuyers(v[0])
-                }
+                onValueChange={(v) => setBuyers(v[0])}
               />
 
               <div className="text-center">
                 <p className="text-5xl font-bold">
                   {buyers.toLocaleString()}
                 </p>
-
-                <p className="text-muted-foreground">
-                  Concurrent Buyers
-                </p>
+                <p className="text-muted-foreground">Concurrent Buyers</p>
               </div>
             </div>
 
@@ -174,9 +245,7 @@ export default function DemoPage() {
                 onClick={runSimulation}
                 disabled={loading}
               >
-                {loading
-                  ? "Running..."
-                  : "Run Simulation"}
+                {loading ? "Running..." : "Run Simulation"}
               </Button>
             </div>
           </CardContent>
@@ -184,144 +253,109 @@ export default function DemoPage() {
 
         {result && (
           <>
-            {/* PASS BANNER */}
-
-            <Card className="border-green-500">
+            {/* PASS / FAIL BANNER */}
+            <Card className={consistencyPassed ? "border-green-500" : "border-red-500"}>
               <CardContent className="py-10 text-center">
-                <h2 className="text-5xl font-bold text-green-600">
-                  PASS ✅
+                <h2
+                  className={`text-5xl font-bold ${
+                    consistencyPassed ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {consistencyPassed ? "PASS ✅" : "INCONSISTENT ❌"}
                 </h2>
 
                 <p className="text-xl mt-4">
-                  {result.buyers.toLocaleString()}
-                  {" "}buyers competed for{" "}
-                  {TOTAL_TICKETS} tickets with
-                  zero overselling.
+                  {result.buyers.toLocaleString()} buyers competed for{" "}
+                  {totalTickets} tickets with zero overselling.
                 </p>
               </CardContent>
             </Card>
 
             {/* MAIN STATS */}
-
             <div className="grid md:grid-cols-3 gap-4">
               <StatCard
                 title="Concurrent Buyers"
                 value={result.buyers.toLocaleString()}
               />
-
               <StatCard
                 title="Reservations Created"
                 value={result.success}
               />
-
               <StatCard
                 title="Race Conditions"
                 value={result.race_conditions}
               />
             </div>
 
-            {/* SECONDARY */}
-
+            {/* SECONDARY STATS */}
             <div className="grid md:grid-cols-4 gap-4">
               <StatCard
                 title="Rejected Requests"
                 value={result.sold_out}
               />
-
               <StatCard
                 title="Errors"
                 value={result.errors}
               />
-
               <StatCard
                 title="Inventory Left"
-                value={
-                  result.inventory_remaining
-                }
+                value={result.inventory_remaining}
               />
-
               <StatCard
                 title="Execution Time"
                 value={`${duration} ms`}
               />
             </div>
 
-            {/* CONSISTENCY */}
-
+            {/* CONSISTENCY REPORT */}
             <Card>
               <CardHeader>
-                <CardTitle>
-                  Consistency Report
-                </CardTitle>
+                <CardTitle>Consistency Report</CardTitle>
               </CardHeader>
 
               <CardContent className="space-y-3">
                 <p>
-                  Expected Inventory:
-                  <strong>
-                    {" "}
-                    {TOTAL_TICKETS}
-                  </strong>
+                  Expected Initial Inventory:
+                  <strong> {totalTickets}</strong>
                 </p>
-
                 <p>
                   Allocated:
-                  <strong>
-                    {" "}
-                    {result.success}
-                  </strong>
+                  <strong> {result.success}</strong>
                 </p>
-
                 <p>
                   Remaining:
-                  <strong>
-                    {" "}
-                    {
-                      result.inventory_remaining
-                    }
-                  </strong>
+                  <strong> {result.inventory_remaining}</strong>
                 </p>
-
-                <p className="text-green-600 font-bold">
-                  Consistency Check:
-                  {" "}
-                  {consistencyPassed
-                    ? "PASSED ✅"
-                    : "FAILED ❌"}
+                <p
+                  className={`font-bold ${
+                    consistencyPassed ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  Consistency Check:{" "}
+                  {consistencyPassed ? "PASSED ✅" : "FAILED ❌"}
                 </p>
               </CardContent>
             </Card>
 
             {/* UTILIZATION */}
-
             <Card>
               <CardHeader>
-                <CardTitle>
-                  Inventory Utilization
-                </CardTitle>
+                <CardTitle>Inventory Utilization</CardTitle>
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <Progress
-                  value={Number(utilization)}
-                />
-
+                <Progress value={Number(utilization)} />
                 <div className="flex justify-between">
                   <span>
-                    {result.success}/
-                    {TOTAL_TICKETS}
-                    {" "}Tickets Allocated
+                    {result.success}/{totalTickets} Tickets Allocated
                   </span>
-
-                  <span className="font-bold">
-                    {utilization}%
-                  </span>
+                  <span className="font-bold">{utilization}%</span>
                 </div>
               </CardContent>
             </Card>
-            </>
-          )}
-        </div>
+          </>
+        )}
+      </div>
     </main>
   );
 }
@@ -336,13 +370,8 @@ function StatCard({
   return (
     <Card>
       <CardContent className="pt-6">
-        <p className="text-sm text-muted-foreground">
-          {title}
-        </p>
-
-        <p className="text-4xl font-bold mt-2">
-          {value}
-        </p>
+        <p className="text-sm text-muted-foreground">{title}</p>
+        <p className="text-4xl font-bold mt-2">{value}</p>
       </CardContent>
     </Card>
   );

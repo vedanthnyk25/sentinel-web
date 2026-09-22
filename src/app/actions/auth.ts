@@ -2,12 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { API_BASE_URL } from "@/lib/constants";
 
 export async function loginUser(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  const res= await fetch("http://localhost:8080/auth/login", {
+  const res= await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -29,7 +30,7 @@ export async function loginUser(formData: FormData) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24  
+      maxAge: 60 * 60 * 24
     });
 
     redirect("/");
